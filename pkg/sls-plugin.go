@@ -270,17 +270,31 @@ func (ds *SlsDatasource) QueryLogs(ch chan Result, query backend.DataQuery, clie
 	log.DefaultLogger.Info("QueryLogs", "queryInfo", queryInfo)
 
 	var ycols []string
-	offset := (queryInfo.CurrentPage - 1) * queryInfo.LogsPerPage
-	getLogsResp, err := client.GetLogs(logSource.Project, logSource.LogStore, "",
-		from, to, queryInfo.Query, queryInfo.LogsPerPage, offset, true)
-	if err != nil {
-		log.DefaultLogger.Error("GetLogs ", "query : ", queryInfo.Query, "error ", err)
-		response.Error = err
-		ch <- Result{
-			refId:        refId,
-			dataResponse: response,
+	queryCount := GetQueryCount(queryInfo)
+	getLogsResp := &sls.GetLogsResponse{}
+	for i := 0; i < int(queryCount); i++ {
+		offset := (queryInfo.CurrentPage - 1) * queryInfo.LogsPerPage
+		tem, err := client.GetLogs(logSource.Project, logSource.LogStore, "",
+			from, to, queryInfo.Query, queryInfo.LogsPerPage, offset, true)
+		if err != nil {
+			log.DefaultLogger.Error("GetLogs ", "query : ", queryInfo.Query, "error ", err)
+			response.Error = err
+			ch <- Result{
+				refId:        refId,
+				dataResponse: response,
+			}
+			return
 		}
-		return
+		if i == 0 {
+			getLogsResp = tem
+		} else {
+			getLogsResp.Logs = append(getLogsResp.Logs, tem.Logs...)
+			getLogsResp.Count = getLogsResp.Count + tem.Count
+		}
+		if tem.Count < queryInfo.LogsPerPage {
+			break
+		}
+		queryInfo.CurrentPage++
 	}
 	logs := getLogsResp.Logs
 	c := &Contents{}
@@ -325,7 +339,7 @@ func (ds *SlsDatasource) QueryLogs(ch chan Result, query backend.DataQuery, clie
 		return
 	}
 	if !strings.Contains(queryInfo.Query, "|") {
-		log.DefaultLogger.Info("BuildLogs")
+		log.DefaultLogger.Info("BuildLogs", "totalResults", len(logs))
 		ds.BuildLogs(logs, ycols, &frames)
 		response.Frames = frames
 		ch <- Result{
@@ -370,6 +384,26 @@ func (ds *SlsDatasource) QueryLogs(ch chan Result, query backend.DataQuery, clie
 		refId:        refId,
 		dataResponse: response,
 	}
+}
+
+func GetQueryCount(queryInfo *QueryInfo) int64 {
+	if strings.Contains(strings.ToUpper(queryInfo.Query), "SELECT") && strings.Contains(queryInfo.Query, "|") {
+		return 1
+	}
+	if queryInfo.TotalResults >= 5000 {
+		queryInfo.TotalResults = 5000
+	}
+	if queryInfo.TotalResults <= 0 {
+		queryInfo.TotalResults = 1
+	}
+	if queryInfo.TotalResults < queryInfo.LogsPerPage {
+		queryInfo.LogsPerPage = queryInfo.TotalResults
+	}
+
+	if queryInfo.LogsPerPage > 0 {
+		return (queryInfo.TotalResults + queryInfo.LogsPerPage - 1) / queryInfo.LogsPerPage
+	}
+	return 1
 }
 
 func (ds *SlsDatasource) BuildFlowGraphV2(logs []map[string]string, xcol string, ycols []string, frames *data.Frames) {

@@ -17,13 +17,14 @@ type LogSource struct {
 }
 
 type QueryInfo struct {
-	QueryType   string `json:"type"`
-	QueryMode   string `json:"mode"`
-	Query       string `json:"query"`
-	Xcol        string `json:"xcol"`
-	Ycol        string `json:"ycol"`
-	LogsPerPage int64  `json:"logsPerPage"`
-	CurrentPage int64  `json:"currentPage"`
+	QueryType    string `json:"type"`
+	QueryMode    string `json:"mode"`
+	Query        string `json:"query"`
+	Xcol         string `json:"xcol"`
+	Ycol         string `json:"ycol"`
+	LogsPerPage  int64  `json:"logsPerPage"`
+	CurrentPage  int64  `json:"currentPage"`
+	TotalResults int64  `json:"totalResults"`
 }
 
 type Result struct {
