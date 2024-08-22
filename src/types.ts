@@ -6,6 +6,7 @@ export interface SLSQuery extends DataQuery {
   ycol?: string;
   logsPerPage?: number;
   currentPage?: number;
+  totalResults?: number;
 }
 
 export const defaultQuery: Partial<SLSQuery> = {
@@ -14,6 +15,7 @@ export const defaultQuery: Partial<SLSQuery> = {
   ycol: '',
   logsPerPage: 100,
   currentPage: 1,
+  totalResults: 100,
 };
 
 /**
