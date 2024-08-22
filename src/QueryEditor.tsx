@@ -14,12 +14,12 @@ import {
 import { QueryEditorProps } from '@grafana/data';
 // import { css } from '@emotion/css';
 
-import { SLSDataSource } from './datasource';
+import { SLSDataSource, replaceFormat } from './datasource';
 import { defaultQuery, SLSDataSourceOptions, SLSQuery } from './types';
 import { version, xSelectOptions } from './const';
 import MonacoQueryField from './SLS-monaco-editor/MonacoQueryField';
 import MonacoQueryFieldOld from 'SLS-monaco-editor/MonacoQueryFieldOld';
-import { getBackendSrv } from '@grafana/runtime';
+import { getBackendSrv, getTemplateSrv } from '@grafana/runtime';
 import { Base64 } from 'js-base64';
 import { SelectTips } from 'SelectTips';
 
@@ -109,7 +109,7 @@ export class SLSQueryEditor extends PureComponent<Props> {
     const { datasource, query, range } = this.props;
     const startTime = range?.from.unix() ?? Math.round(Date.now() / 1000 - 900);
     const endTime = range?.to.unix() ?? Math.round(Date.now() / 1000);
-
+    const queryStr = getTemplateSrv().replace(query.query ?? '', {}, replaceFormat);
     try {
       this.setState({
         loading: true,
@@ -123,7 +123,7 @@ export class SLSQueryEditor extends PureComponent<Props> {
           headers: { 'Content-Type': 'application/json' },
           data: {
             Encoding: `encode=base64&queryString=${encodeURIComponent(
-              Base64.encode(query.query ?? '')
+              Base64.encode(queryStr ?? '')
             )}&queryTimeType=99&startTime=${startTime}&endTime=${endTime}`,
           },
         })

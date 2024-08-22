@@ -792,7 +792,13 @@ func (ds *SlsDatasource) BuildLogs(logs []map[string]string, ycols []string, fra
 			message = message + k + `="` + strings.ReplaceAll(alog[k], `"`, `'`) + `" `
 		}
 		timeValue, _ := strconv.ParseFloat(alog["__time__"], 64)
-		t := time.Unix(int64(timeValue), 0)
+		var t time.Time
+		if ns, ok := alog["__time_ns_part__"]; ok {
+			ns, _ := strconv.ParseInt(ns, 10, 64)
+			t = time.Unix(int64(timeValue), ns)
+		} else {
+			t = time.Unix(int64(timeValue), 0)
+		}
 		times = append(times, t)
 		values = append(values, message)
 	}
