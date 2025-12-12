@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +17,151 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/resource/httpadapter"
 )
+
+// InterpolateMacros replaces Grafana macros with SLS SQL equivalents
+// Supported macros:
+// $__time(col) -> to_unixtime(col) as time
+// $__timeFilter(col) -> col >= from AND col < to
+// $__timeGroup(col, 'interval', [fill]) -> time_series(col, 'interval', '%Y-%m-%d %H:%i:%s', fill)
+// $__timeGroupAlias(col, 'interval') -> time_series(...) as time
+func InterpolateMacros(query string, from, to int64) string {
+	// $__time(dateColumn)
+	// Example: $__time(log_time) -> to_unixtime(log_time) as time
+	timeReg := regexp.MustCompile(`\$__time\(([^)]+)\)`)
+	query = timeReg.ReplaceAllString(query, "to_unixtime($1) as time")
+
+	// $__timeFilter(dateColumn)
+	// Example: $__timeFilter(__time__) -> __time__ >= 1600000000 AND __time__ < 1600003600
+	timeFilterReg := regexp.MustCompile(`\$__timeFilter\(([^)]+)\)`)
+	query = timeFilterReg.ReplaceAllStringFunc(query, func(match string) string {
+		parts := timeFilterReg.FindStringSubmatch(match)
+		if len(parts) == 2 {
+			col := parts[1]
+			return fmt.Sprintf("%s >= %d AND %s < %d", col, from, col, to)
+		}
+		return match
+	})
+
+	// $__timeGroup(dateColumn, '5m', fill)
+	// Matches: $__timeGroup(col, 'interval' [, fill])
+	// Note: interval is expected to be quoted, fill is optional
+	timeGroupReg := regexp.MustCompile(`\$__timeGroup\(\s*([^,]+)\s*,\s*'([^']+)'(?:\s*,\s*([^)]+))?\s*\)`)
+	query = timeGroupReg.ReplaceAllStringFunc(query, func(match string) string {
+		parts := timeGroupReg.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		col := parts[1]
+		interval := parts[2]
+		fill := "0" // Default fill
+		if len(parts) > 3 && parts[3] != "" {
+			fill = strings.TrimSpace(parts[3])
+		}
+
+		// Map fill strategies
+		// SLS: '0', 'null', 'last'
+		slsFill := "'0'"
+		switch strings.ToLower(fill) {
+		case "null":
+			slsFill = "'null'"
+		case "previous":
+			slsFill = "'last'"
+		case "0":
+			slsFill = "'0'"
+		default:
+			// Treat as explicit value, wrap in quotes for SLS if it looks like a number or string
+			// SLS time_series padding expects a string literal '...'
+			slsFill = fmt.Sprintf("'%s'", fill)
+		}
+
+		return fmt.Sprintf("time_series(%s, '%s', '%%Y-%%m-%%d %%H:%%i:%%s', %s)", col, interval, slsFill)
+	})
+
+	// $__timeGroupAlias(dateColumn, '5m')
+	// Similar to timeGroup but adds 'as time'
+	timeGroupAliasReg := regexp.MustCompile(`\$__timeGroupAlias\(\s*([^,]+)\s*,\s*'([^']+)'\s*\)`)
+	query = timeGroupAliasReg.ReplaceAllStringFunc(query, func(match string) string {
+		parts := timeGroupAliasReg.FindStringSubmatch(match)
+		if len(parts) < 3 {
+			return match
+		}
+		col := parts[1]
+		interval := parts[2]
+		return fmt.Sprintf("time_series(%s, '%s', '%%Y-%%m-%%d %%H:%%i:%%s', '0') as time", col, interval)
+	})
+
+	log.DefaultLogger.Debug("InterpolateMacros", "original", query, "result", query)
+	return query
+}
+
+// interpolateMacros 为了向后兼容保留的简化版本
+// 使用默认时间范围调用完整的InterpolateMacros函数
+func interpolateMacros(query string) string {
+	// 使用默认时间范围（当前时间前后24小时）
+	now := int64(1600000000) // 可以根据需要调整默认值
+	from := now - 86400      // 24小时前
+	to := now + 86400        // 24小时后
+	return InterpolateMacros(query, from, to)
+}
+
+// decodeBase64Query 解码Base64编码的查询字符串
+func decodeBase64Query(encodedQuery string) (string, error) {
+	decoded, err := base64.StdEncoding.DecodeString(encodedQuery)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 query: %w", err)
+	}
+	return string(decoded), nil
+}
+
+// encodeBase64Query 编码查询字符串为Base64
+func encodeBase64Query(query string) string {
+	return base64.StdEncoding.EncodeToString([]byte(query))
+}
+
+// processEncodingMacros 处理Encoding字符串中的查询宏
+func processEncodingMacros(encoding string) (string, error) {
+	// 解析URL参数
+	params, err := url.ParseQuery(encoding)
+	if err != nil {
+		return encoding, fmt.Errorf("failed to parse encoding parameters: %w", err)
+	}
+
+	queryString := params.Get("queryString")
+	if queryString == "" {
+		// 如果没有queryString参数，直接返回原始编码
+		return encoding, nil
+	}
+
+	// URL解码
+	decodedQueryString, err := url.QueryUnescape(queryString)
+	if err != nil {
+		return encoding, fmt.Errorf("failed to URL decode queryString: %w", err)
+	}
+
+	// Base64解码
+	originalQuery, err := decodeBase64Query(decodedQueryString)
+	if err != nil {
+		return encoding, fmt.Errorf("failed to base64 decode query: %w", err)
+	}
+
+	// 应用宏转换
+	interpolatedQuery := interpolateMacros(originalQuery)
+
+	// Base64编码转换后的查询
+	encodedQuery := encodeBase64Query(interpolatedQuery)
+
+	// URL编码
+	urlEncodedQuery := url.QueryEscape(encodedQuery)
+
+	// 重新构建参数
+	params.Set("queryString", urlEncodedQuery)
+
+	log.DefaultLogger.Debug("processEncodingMacros",
+		"original", originalQuery,
+		"interpolated", interpolatedQuery)
+
+	return params.Encode(), nil
+}
 
 func newResourceHandler(ds *SlsDatasource) backend.CallResourceHandler {
 	mux := http.NewServeMux()
@@ -138,6 +285,17 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// 对传入的查询进行宏转换
+	if data.Encoding != "" {
+		newEncoding, err := processEncodingMacros(data.Encoding)
+		if err != nil {
+			log.DefaultLogger.Warn("Failed to process macros in encoding", "error", err)
+			// 继续执行，使用原始编码
+		} else {
+			data.Encoding = newEncoding
+		}
 	}
 
 	logstoreType := "/logsearch/"

@@ -107,12 +107,12 @@ func (ds *SlsDatasource) QueryData(ctx context.Context, req *backend.QueryDataRe
 		}
 	}()
 
-	log.DefaultLogger.Debug("len(queries)", "len", len(queries))
+	log.DefaultLogger.Info("len(queries)", "len", len(queries))
 	wg := sync.WaitGroup{}
 	for _, query := range queries {
 		wg.Add(1)
-		log.DefaultLogger.Debug("range_queries", "RefID", query.RefID,
-			"JSON", query.JSON, "QueryType", query.QueryType)
+		log.DefaultLogger.Info("range_queries", "RefID", query.RefID,
+			"JSON", query, "QueryType", query.QueryType)
 		go ds.QueryLogs(ch, query, client, config)
 	}
 	go func(chan Result) {
@@ -268,6 +268,14 @@ func (ds *SlsDatasource) QueryLogs(ch chan Result, query backend.DataQuery, clie
 			dataResponse: response,
 		}
 		return
+	}
+
+	// 对查询进行宏转换
+	if queryInfo.Query != "" {
+		originalQuery := queryInfo.Query
+		queryInfo.Query = interpolateMacros(queryInfo.Query)
+		log.DefaultLogger.Info("Macro interpolation", "refId", refId,
+			"original", originalQuery, "interpolated", queryInfo.Query)
 	}
 	xcol := queryInfo.Xcol
 
