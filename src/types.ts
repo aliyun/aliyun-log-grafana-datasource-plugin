@@ -45,6 +45,7 @@ export interface SLSDataSourceOptions extends DataSourceJsonData {
   logstore?: string;
   roleArn?: string;
   region?: string;
+  international?: boolean;
   headers?: HeaderWithValue[]
 }
 

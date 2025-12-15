@@ -6,6 +6,7 @@ import CustomHeaders from './custom-header/custom-headers';
 import { ConfigSection } from './components/configSection';
 import { DataSourceDescription } from './components/description';
 import { SecretInput } from './components/QueryEditor/SecretInput';
+import { InlineSwitch } from './components/Switch/switch';
 
 interface Props extends DataSourcePluginOptionsEditorProps<SLSDataSourceOptions> {}
 
@@ -124,6 +125,15 @@ export class SLSConfigEditor extends PureComponent<Props, State> {
     const jsonData = {
       ...options.jsonData,
       headers,
+    };
+    onOptionsChange({ ...options, jsonData });
+  };
+
+  onInternationalChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onOptionsChange, options } = this.props;
+    const jsonData = {
+      ...options.jsonData,
+      international: event.target.checked,
     };
     onOptionsChange({ ...options, jsonData });
   };
@@ -250,6 +260,26 @@ export class SLSConfigEditor extends PureComponent<Props, State> {
         {/* Other  */}
         <hr style={{ margin: '20px 0' }} />
         <ConfigSection title="Other">
+          {/* international */}
+          <InlineField
+            htmlFor="connection-international"
+            label={'International'}
+            labelWidth={24}
+            tooltip={
+              <>
+                Whether to use the international endpoint
+              </>
+            }
+            grow
+            interactive
+          >
+            <InlineSwitch
+              id="connection-international"
+              aria-label="是否为国际站"
+              onChange={this.onInternationalChange}
+              value={jsonData.international || false}
+            />
+          </InlineField>
           <InlineField
             style={{ marginTop: '8px' }}
             tooltip={'请输入默认的Logstore,如果不填写,请确保您的 ak 账号具备该 project 的ListLogStore读权限'}
