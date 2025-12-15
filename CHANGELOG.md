@@ -1,5 +1,10 @@
 # Changelog
 
+# 2.39 (2025-12-12)
+- 支持 “gotoSLS” 跳转国际站 project
+  - 数据源配置页面新增 International 字段，用于跳转到国际站。
+    ![international字段](./img/2.39/international_2.39.jpg)
+
 # 2.38 (2025-03-03)
 - 修复时序库跳转 SLS 路径问题。
 - 日志输出级别整理，减少无用输出。
