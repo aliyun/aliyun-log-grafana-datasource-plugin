@@ -273,6 +273,7 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 	arn := config.RoleArn
 	prj := config.Project
 	logstore := config.LogStore
+	international := config.International
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -339,6 +340,11 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 		// response["policy"] = p
 	}
 
+	baseDomain := "aliyun"
+	if international {
+		baseDomain = "alibabacloud"
+	}
+
 	if !normalJump {
 		client := NewClient(ak, sk, arn, "default")
 		stsResp, err := client.AssumeRole(900)
@@ -357,17 +363,17 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 		token := stsResp.Credentials.SecurityToken
 
 		// 使用STS Token换取控制台Signin Token
-		SigninResp, err := getSigninToken(id, secret, token)
+		SigninResp, err := getSigninToken(id, secret, token, baseDomain)
 		if err != nil {
 			panic(err)
 		}
 		signinToken := SigninResp.SigninToken
 
 		// 生成登录链接
-		loginUrl := "http://www.aliyun.com"
+		loginUrl := "http://www." + baseDomain + ".com"
 		// destination := "http://sls4service.console.aliyun.com"
-		destination := "http://sls4service.console.aliyun.com/lognext/project/" + prj + logstoreType + logstore + "?isShare=true&hideTopbar=true&hideSidebar=true&ignoreTabLocalStorage=true&" + data.Encoding
-		url, err := genSigninUrl(signinToken, loginUrl, destination)
+		destination := "http://sls4service.console." + baseDomain + ".com/lognext/project/" + prj + logstoreType + logstore + "?isShare=true&hideTopbar=true&hideSidebar=true&ignoreTabLocalStorage=true&" + data.Encoding
+		url, err := genSigninUrl(signinToken, loginUrl, destination, baseDomain)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			log.DefaultLogger.Error(err.Error())
@@ -381,7 +387,7 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 		log.DefaultLogger.Debug("Goto SLS with STS success.", url)
 		return
 	}
-	url := "https://sls.console.aliyun.com/lognext/project/" + prj + logstoreType + logstore + "?" + data.Encoding
+	url := "https://sls.console." + baseDomain + ".com/lognext/project/" + prj + logstoreType + logstore + "?" + data.Encoding
 	response["url"] = url
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -389,8 +395,8 @@ func (ds *SlsDatasource) gotoSLS(w http.ResponseWriter, r *http.Request) {
 	log.DefaultLogger.Debug("Goto SLS with Normal jump success.", url)
 }
 
-func getSigninToken(id string, secret string, token string) (*SigninResponse, error) {
-	urlStr := "http://signin.aliyun.com/federation?Action=GetSigninToken"
+func getSigninToken(id string, secret string, token string, baseDomain string) (*SigninResponse, error) {
+	urlStr := "http://signin." + baseDomain + ".com/federation?Action=GetSigninToken"
 	urlStr += "&AccessKeyId=" + id
 	urlStr += "&AccessKeySecret=" + secret
 	urlStr += "&SecurityToken=" + url.QueryEscape(token)
@@ -419,8 +425,8 @@ func getSigninToken(id string, secret string, token string) (*SigninResponse, er
 	return &resp, nil
 }
 
-func genSigninUrl(signinToken string, loginUrl string, destination string) (string, error) {
-	urlStr := "http://signin.aliyun.com/federation?Action=Login"
+func genSigninUrl(signinToken string, loginUrl string, destination string, baseDomain string) (string, error) {
+	urlStr := "http://signin." + baseDomain + ".com/federation?Action=Login"
 	urlStr += "&LoginUrl=" + url.QueryEscape(loginUrl)
 	urlStr += "&Destination=" + url.QueryEscape(destination)
 	urlStr += "&SigninToken=" + url.QueryEscape(signinToken)

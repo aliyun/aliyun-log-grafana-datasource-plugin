@@ -307,6 +307,7 @@ export class SLSQueryEditor extends PureComponent<Props> {
               options={uniqLogstoreList}
               onChange={this.onLogstoreChange}
               value={logstore || defaultLogstore}
+              allowCustomValue={true}
             />
           </InlineField>
 

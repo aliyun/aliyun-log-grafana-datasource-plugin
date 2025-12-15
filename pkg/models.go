@@ -21,6 +21,7 @@ type LogSource struct {
 	AccessKeyId     string
 	AccessKeySecret string
 	Headers         []Header `json:"headers"`
+	International   bool     `json:"international"`
 }
 
 type QueryInfo struct {
