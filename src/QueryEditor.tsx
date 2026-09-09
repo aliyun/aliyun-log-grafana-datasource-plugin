@@ -10,7 +10,7 @@ import { defaultEidtorQuery, defaultQuery, SLSDataSourceOptions, SLSQuery } from
 import { dataSourceType, version, xSelectOptions } from './const';
 import MonacoQueryField from './SLS-monaco-editor/MonacoQueryField';
 import MonacoQueryFieldOld from 'SLS-monaco-editor/MonacoQueryFieldOld';
-import { getBackendSrv, getDataSourceSrv, getTemplateSrv } from '@grafana/runtime';
+import { getDataSourceSrv, getTemplateSrv } from '@grafana/runtime';
 import { Base64 } from 'js-base64';
 import { SelectTips } from 'SelectTips';
 import EditorRow from './components/QueryEditor/EditorRow';
@@ -179,31 +179,24 @@ export class SLSQueryEditor extends PureComponent<Props> {
         loading: true,
       });
 
-      getBackendSrv()
-        .datasourceRequest({
-          // url: `/api/datasources/uid/${datasource.uid}/resources/api/gotoSLS`,   // only ok with 9.0.0+
-          url: `/api/datasources/${datasource.id}/resources/api/gotoSLS`,
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          data: {
-            Encoding: `encode=base64&queryString=${encodeURIComponent(
-              Base64.encode(queryStr ?? '')
-            )}&queryTimeType=99&startTime=${startTime}&endTime=${endTime}`,
-            logstore: logstore,
-            type: this.state.datasourceType
-          },
+      datasource
+        .postResource('api/gotoSLS', {
+          Encoding: `encode=base64&queryString=${encodeURIComponent(
+            Base64.encode(queryStr ?? '')
+          )}&queryTimeType=99&startTime=${startTime}&endTime=${endTime}`,
+          logstore: logstore,
+          type: this.state.datasourceType
         })
         .then((response) => {
           this.setState({
             loading: false,
           });
-          // console.log(response.data);
-          const err = response.data.err;
-          const url = response.data.url;
+          const err = response.err;
+          const url = response.url;
           if (err !== '') {
             this.setState({
               showAlert: true,
-              message: response.data.message,
+              message: response.message,
               url: url,
             });
           } else {
@@ -232,21 +225,15 @@ export class SLSQueryEditor extends PureComponent<Props> {
     const { project } = settings as SLSDataSourceOptions;
 
     try {
-      getBackendSrv()
-        .datasourceRequest({
-          // url: `/api/datasources/uid/${datasource.uid}/resources/api/gotoSLS`,   // only ok with 9.0.0+
-          url: `/api/datasources/${datasource.id}/resources/api/getLogstoreList`,
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          data: {
-            Project: project,
-            TelemetryType: type === 'all' || !type ? '' : type === 'logstore' ? 'None' : 'Metrics',
-          },
+      datasource
+        .postResource('api/getLogstoreList', {
+          Project: project,
+          TelemetryType: type === 'all' || !type ? '' : type === 'logstore' ? 'None' : 'Metrics',
         })
         .then((response) => {
-          if (response.status === 200 && response.data?.data) {
+          if (response?.data) {
             this.setState({
-              logstoreList: response.data.data || [],
+              logstoreList: response.data || [],
             });
           }
         })

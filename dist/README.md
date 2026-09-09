@@ -4,7 +4,16 @@
 日志服务 SLS 是云原生观测分析平台，为Log/Metric/Trace等数据提供大规模、低成本、实时平台化服务。一站式提供数据采集、加工、分析、告警可视化与投递功能，全面提升研发、运维、运营和安全等场景数字化能力。[官方文档](https://www.aliyun.com/product/sls)<br />本仓库为阿里云日志服务Grafana数据源插件。使用本插件的前提，需要您使用日志服务产品，并拥有至少1个已配置采集的LogStore。
 <a name="zsCS1"></a>
 # 2. 安装
-依赖 Grafana 8.0 及以上版本 , Grafana 8.0 以下请使用1.0版本。<br />于[Release处下载](https://github.com/aliyun/aliyun-log-grafana-datasource-plugin/releases)本插件到grafana插件目录下，修改配置文件，在配置文件的[plugins] 节点中，设置 `allow_loading_unsigned_plugins = aliyun-log-service-datasource`， 然后重启grafana。
+依赖 Grafana 8.0 及以上版本 , Grafana 8.0 以下请使用1.0版本。
+
+## 版本兼容性
+
+- 插件 **2.39.1** 修复 Grafana 13 默认停用数字 ID 数据源接口后，日志库列表无法加载和 `goto SLS` 返回 404 的问题。
+- 本版本最高已验证的 Grafana 版本为 **13.0.2**，并在 **11.4.0** 上回归验证。使用模拟 SLS 响应验证数据源配置、日志库选择、查询与 `goto SLS` 资源调用；更高版本尚未验证，请先在测试环境确认兼容性。
+- 插件 **2.39** 在 Grafana **13.0.2** 默认配置下存在上述问题，使用 Grafana 13 时请升级插件。11.4.0 为已验证的旧版对照，不代表所有更高版本均不兼容。
+- 保留 Grafana 8.x 及以上的运行时资源 API 调用方式；不要仅凭插件声明的最低 Grafana 版本判断其与未来版本的兼容性。
+
+于[Release处下载](https://github.com/aliyun/aliyun-log-grafana-datasource-plugin/releases)本插件到grafana插件目录下，修改配置文件，在配置文件的[plugins] 节点中，设置 `allow_loading_unsigned_plugins = aliyun-log-service-datasource`， 然后重启grafana。
 
 - mac 
    - 插件目录： `/usr/local/var/lib/grafana/plugins`
