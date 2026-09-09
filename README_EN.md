@@ -4,7 +4,15 @@
 Log service is a cloud-native observation and analysis platform that provides large-scale, low-cost, and real-time platform services for Log, Metric, and Trace data. One-stop data collection, processing, analysis, alarm visualization, and delivery are provided to improve the digitization capabilities of R &amp; D, O &amp; M, operations, and security scenarios. [Official documentation ](https://www.aliyun.com/product/sls)<br />this repository is an Alibaba Cloud log service Grafana data source plug-in. Before using this plug-in, you must use log service products and have at least one LogStore configured for collection.
 <a name="zsCS1"></a>
 # 2. Installation
-The dependency Grafana version 8.0 and later. Grafana version 8.0 and later, use version 1.0. <br /> [download from Release ](https://github.com/aliyun/aliyun-log-grafana-datasource-plugin/releases). Go to the grafana plug-in directory and modify the configuration file. `[plugins] `node, set `allow_loading_unsigned_plugins = aliyun-log-service-datasource `, and then restart the grafana.
+
+## Version compatibility
+
+- Plugin **2.39.1** fixes logstore selection and `goto SLS` returning 404 after Grafana 13 disabled numeric-ID data source APIs by default.
+- The highest Grafana version verified for this release is **13.0.2**, with regression checks on **11.4.0**. Checks use simulated SLS responses and cover data source configuration, logstore selection, queries, and `goto SLS` resource calls. Later versions have not been verified; validate them in a test environment before upgrading.
+- Plugin **2.39** exhibits these failures on **13.0.2** with default settings. Upgrade the plugin when using Grafana 13. The 11.4.0 comparison does not imply that every later version is incompatible.
+- Resource calls continue to use the runtime API available in Grafana 8.x and later. A minimum Grafana version declaration is not a guarantee of compatibility with future versions.
+
+Grafana 8.0 and later is required. For Grafana versions earlier than 8.0, use plugin version 1.0. <br /> [download from Release ](https://github.com/aliyun/aliyun-log-grafana-datasource-plugin/releases). Go to the grafana plug-in directory and modify the configuration file. `[plugins] `node, set `allow_loading_unsigned_plugins = aliyun-log-service-datasource `, and then restart the grafana.
 
 - mac 
    - Plug-In Directory： `/usr/local/var/lib/grafana/plugins`
