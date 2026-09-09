@@ -1,0 +1,103 @@
+name: Package plugin
+run-name: Package plugin from ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag (for example: 2.39.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PLUGIN_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Validate tag format
+        shell: python
+        run: |
+          import os
+          import re
+
+          if not re.fullmatch(r"v?[0-9]+\.[0-9]+(?:\.[0-9]+)?", os.environ["PLUGIN_TAG"]):
+              raise SystemExit("Use an existing version tag, such as 2.39, 2.39.1 or v2.39.1")
+
+      - name: Check out the exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+
+      - name: Validate and package committed dist
+        id: package
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import zipfile
+
+          tag = os.environ["PLUGIN_TAG"]
+          version = tag.removeprefix("v")
+          commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          package = json.loads(subprocess.check_output(["git", "show", "HEAD:package.json"]))
+          plugin = json.loads(subprocess.check_output(["git", "show", "HEAD:dist/plugin.json"]))
+          plugin_id = "aliyun-log-service-datasource"
+          if package["version"] != version or plugin["info"]["version"] != version:
+              raise SystemExit("Tag, package.json and dist/plugin.json versions must match")
+          if plugin["id"] != plugin_id or plugin.get("backend") is not True:
+              raise SystemExit("Unexpected plugin ID or missing backend declaration")
+
+          output = Path(os.environ["RUNNER_TEMP"]) / "plugin-package"
+          output.mkdir()
+          archive = output / f"{plugin_id}-{version}.zip"
+          subprocess.run([
+              "git", "archive", "--format=zip", f"--prefix={plugin_id}/",
+              f"--output={archive}", "HEAD:dist",
+          ], check=True)
+
+          platforms = [
+              "darwin_amd64", "darwin_arm64", "linux_amd64",
+              "linux_arm", "linux_arm64", "windows_amd64.exe",
+          ]
+          binaries = [f"{plugin['executable']}_{platform}" for platform in platforms]
+          required = ["plugin.json", "module.js", "LICENSE", "README.md"] + binaries
+          with zipfile.ZipFile(archive) as bundle:
+              for name in required:
+                  entry = bundle.getinfo(f"{plugin_id}/{name}")
+                  if entry.file_size == 0:
+                      raise SystemExit(f"Empty package file: {name}")
+                  if name in binaries and not name.endswith(".exe"):
+                      if not (entry.external_attr >> 16) & 0o111:
+                          raise SystemExit(f"Backend is not executable: {name}")
+              if bundle.testzip() is not None:
+                  raise SystemExit("ZIP integrity check failed")
+
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          archive.with_suffix(".zip.sha256").write_text(f"{digest}  {archive.name}\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as result:
+              result.write(f"path={output}\nname={plugin_id}-{version}\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(
+                  f"Packaged tag `{tag}` at commit `{commit}`.\n\n"
+                  f"Download `{archive.name}` and its SHA256 file from the run artifacts.\n\n"
+                  "The ZIP contains the committed dist, including all six backend binaries. "
+                  "This workflow does not rebuild, sign or publish a release.\n"
+              )
+
+      - name: Upload plugin package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.path }}/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30

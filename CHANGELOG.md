@@ -1,5 +1,9 @@
 # Changelog
 
+# 2.39.2 (2026-09-09)
+
+- 新增 GitHub Actions 手动打包流程，按已有 tag 校验并打包已提交的 dist，提供安装 ZIP 和 SHA256 校验文件。
+
 # 2.39.1 (2026-09-09)
 
 - 修复 Grafana 13 默认停用数字 ID 数据源接口后，日志库列表和 goto SLS 请求返回 404 的问题；通过 Grafana 运行时资源 API 保持旧版兼容性。
