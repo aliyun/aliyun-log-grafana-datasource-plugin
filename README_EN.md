@@ -26,6 +26,23 @@ Grafana 8.0 and later is required. For Grafana versions earlier than 8.0, use pl
    - Plug-In Directory：`{PATH_TO}/grafana-{x}.{x}.{x}/data/plugins`
    - Configuration file location：`{PATH_TO}/grafana-{x}.{x}.{x}/conf/defaults.ini`
    - Restart command：`./bin/grafana-server web`
+
+## Package with CI (maintainers)
+
+After `.github/workflows/package-plugin.yml` is merged into the default branch, open **Actions → Package plugin → Run workflow**, select `master`, and enter an existing version tag (for example, `2.39.1`). Alternatively:
+
+```bash
+gh workflow run package-plugin.yml \
+  --repo aliyun/aliyun-log-grafana-datasource-plugin \
+  --ref master -f tag=2.39.1
+```
+
+- Push the version tag to this repository first. Supported formats include `2.39`, `2.39.1` and `v2.39.1`. After stripping the optional `v`, the tag must match both `package.json` and `dist/plugin.json` at that commit.
+- The workflow packages the tag's committed `dist`, checking required files and all six backend binaries. It does not rebuild source code: build and commit `dist` before tagging. Run the workflow from `master` to package older tags that do not contain the workflow.
+- Download the run's **Artifacts** within 30 days. Extract GitHub's outer artifact archive to obtain `aliyun-log-service-datasource-<version>.zip` and its `.zip.sha256` file. Verify with `sha256sum -c *.zip.sha256`.
+- The install ZIP contains a top-level `aliyun-log-service-datasource/` directory. Extract it into Grafana's plugin directory and follow the unsigned-plugin configuration above; the workflow does not sign the plugin.
+- The workflow does not create tags or publish releases. Attach the install ZIP and checksum to the corresponding GitHub Release for distribution.
+
 <a name="t92KT"></a>
 # 3. Add a data source 
 <a name="YihL2"></a>

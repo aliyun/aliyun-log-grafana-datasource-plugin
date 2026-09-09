@@ -27,6 +27,23 @@
    - 插件目录：`{PATH_TO}/grafana-{x}.{x}.{x}/data/plugins`
    - 配置文件位置：`{PATH_TO}/grafana-{x}.{x}.{x}/conf/defaults.ini`
    - 重启命令：`./bin/grafana-server web`
+
+## 通过 CI 打包（维护者）
+
+将 `.github/workflows/package-plugin.yml` 合并到默认分支后，在 GitHub 的 **Actions → Package plugin → Run workflow** 中选择 `master`，并在 `tag` 输入框填写已有版本 tag（例如 `2.39.1`）。也可以使用：
+
+```bash
+gh workflow run package-plugin.yml \
+  --repo aliyun/aliyun-log-grafana-datasource-plugin \
+  --ref master -f tag=2.39.1
+```
+
+- 先将版本 tag 推送到本仓库；支持 `2.39`、`2.39.1`、`v2.39.1` 这类格式。去掉可选的 `v` 前缀后，tag 必须与该提交中 `package.json` 和 `dist/plugin.json` 的版本完全一致。
+- 流程打包指定 tag 已提交的 `dist`，并校验必要文件及六个平台的后端文件；不重新编译源码。因此发布前必须完成构建并提交 `dist`。即使旧 tag 不包含工作流，也可以从 `master` 启动流程进行打包。
+- 成功后在运行页面的 **Artifacts** 下载产物，解开 GitHub 的外层 artifact 压缩包后，可获得 `aliyun-log-service-datasource-<version>.zip` 和同名 `.zip.sha256` 文件；产物保留 30 天。使用 `sha256sum -c *.zip.sha256` 校验。
+- 安装 ZIP 的顶层目录是 `aliyun-log-service-datasource/`，可直接解压到 Grafana 插件目录。工作流不签名，仍需按上述安装说明允许加载未签名插件。
+- 工作流只生成下载产物，不创建 tag 或发布 Release。正式发布时，将安装 ZIP 和 SHA256 文件附加到对应 tag 的 GitHub Release。
+
 <a name="t92KT"></a>
 # 3. 添加数据源
 <a name="YihL2"></a>
