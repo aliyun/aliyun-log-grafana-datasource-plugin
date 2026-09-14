@@ -273,7 +273,7 @@ func (ds *SlsDatasource) QueryLogs(ch chan Result, query backend.DataQuery, clie
 
 	from := query.TimeRange.From.Unix()
 	to := query.TimeRange.To.Unix()
-
+	queryInfo.Query = InterpolateMacros(queryInfo.Query, from, to)
 	var logStore string
 	if queryInfo.LogStore != "" {
 		logStore = queryInfo.LogStore
